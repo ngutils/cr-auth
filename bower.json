@@ -1,0 +1,6 @@
+{
+  "name": "cr-auth",
+  "dependencies": {
+    "angular": "~1.2.16"
+  }
+}
