@@ -27,6 +27,13 @@ angular.module('cr.auth', [])
         }
     };
     
+    /**
+     * forge a auth header.
+     */
+    this.forgeSign = function(sign) {
+        return _base64.encode(sign.username + ":" + sign.password);
+    };
+    
     //provider function
     this.$get = function() {
         return this;
