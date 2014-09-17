@@ -1,5 +1,6 @@
 # cr-auth
 * Bower dependencies [![Dependency Status](https://www.versioneye.com/user/projects/54194f14918598e8bd000089/badge.svg?style=flat)](https://www.versioneye.com/user/projects/54194f14918598e8bd000089)
+* NPM dependencies  [![Dependency Status](https://www.versioneye.com/user/projects/5419541791859833fd00007c/badge.svg?style=flat)](https://www.versioneye.com/user/projects/5419541791859833fd00007c)
 * Travis    [![Build Status](https://travis-ci.org/corley/cr-auth.svg)](https://travis-ci.org/corley/cr-auth)
 
 ``` shell
