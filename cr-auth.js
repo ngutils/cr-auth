@@ -19,7 +19,7 @@ angular.module('cr.auth', [])
     };
     
     /**
-     * set the sign method.An object with username and password is requested
+     * set the sign method. An object with username and password is requested
      */
     this.setSign = function(sign) {
         if(sign.username && sign.password) {
@@ -32,6 +32,10 @@ angular.module('cr.auth', [])
      */
     this.forgeSign = function(sign) {
         return _base64.encode(sign.username + ":" + sign.password);
+    };
+    
+    this.voidSign = function() {
+        _sign = "";
     };
     
     //provider function
