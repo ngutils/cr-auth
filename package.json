@@ -1,12 +1,12 @@
 {
     "name": "cr-auth",
     "devDependencies": {
-        "karma": "0.12.*",
+        "karma": "~0.12",
         "karma-cli": "*",
         "karma-phantomjs-launcher": "*",
         "karma-jasmine": "~0.2.*",
         "phantomjs": "~1.9",
-        "bower": "~1" 
+        "bower": "~1"
     },
     "scripts": {
         "postinstall" : "./node_modules/.bin/bower install",
