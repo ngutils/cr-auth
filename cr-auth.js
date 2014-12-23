@@ -1,45 +1,158 @@
 angular.module('cr.auth', [])
-.provider('$crAuthBasic', [function() { 
-    
-    var _base64 = {_keyStr:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",encode:function(e){var t="";var n,r,i,s,o,u,a;var f=0;e=_base64._utf8_encode(e);while(f<e.length){n=e.charCodeAt(f++);r=e.charCodeAt(f++);i=e.charCodeAt(f++);s=n>>2;o=(n&3)<<4|r>>4;u=(r&15)<<2|i>>6;a=i&63;if(isNaN(r)){u=a=64}else if(isNaN(i)){a=64}t=t+this._keyStr.charAt(s)+this._keyStr.charAt(o)+this._keyStr.charAt(u)+this._keyStr.charAt(a)}return t},decode:function(e){var t="";var n,r,i;var s,o,u,a;var f=0;e=e.replace(/[^A-Za-z0-9\+\/\=]/g,"");while(f<e.length){s=this._keyStr.indexOf(e.charAt(f++));o=this._keyStr.indexOf(e.charAt(f++));u=this._keyStr.indexOf(e.charAt(f++));a=this._keyStr.indexOf(e.charAt(f++));n=s<<2|o>>4;r=(o&15)<<4|u>>2;i=(u&3)<<6|a;t=t+String.fromCharCode(n);if(u!=64){t=t+String.fromCharCode(r)}if(a!=64){t=t+String.fromCharCode(i)}}t=_base64._utf8_decode(t);return t},_utf8_encode:function(e){e=e.replace(/\r\n/g,"\n");var t="";for(var n=0;n<e.length;n++){var r=e.charCodeAt(n);if(r<128){t+=String.fromCharCode(r)}else if(r>127&&r<2048){t+=String.fromCharCode(r>>6|192);t+=String.fromCharCode(r&63|128)}else{t+=String.fromCharCode(r>>12|224);t+=String.fromCharCode(r>>6&63|128);t+=String.fromCharCode(r&63|128)}}return t},_utf8_decode:function(e){var t="";var n=0;var r=c1=c2=0;while(n<e.length){r=e.charCodeAt(n);if(r<128){t+=String.fromCharCode(r);n++}else if(r>191&&r<224){c2=e.charCodeAt(n+1);t+=String.fromCharCode((r&31)<<6|c2&63);n+=2}else{c2=e.charCodeAt(n+1);c3=e.charCodeAt(n+2);t+=String.fromCharCode((r&15)<<12|(c2&63)<<6|c3&63);n+=3}}return t}}
-    
-    var _sign = "";
+.service('crAuthBasic', [function() {
+
+    var _config = {
+        username: "username",
+        password: "password"
+    };
+
+    var base64_decode = function(data) {
+        var b64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+        var o1, o2, o3, h1, h2, h3, h4, bits, i = 0,
+            ac = 0,
+            dec = '',
+            tmp_arr = [];
+
+        if (!data) {
+            return data;
+        }
+
+        data += '';
+
+        do { // unpack four hexets into three octets using index points in b64
+            h1 = b64.indexOf(data.charAt(i++));
+            h2 = b64.indexOf(data.charAt(i++));
+            h3 = b64.indexOf(data.charAt(i++));
+            h4 = b64.indexOf(data.charAt(i++));
+
+            bits = h1 << 18 | h2 << 12 | h3 << 6 | h4;
+
+            o1 = bits >> 16 & 0xff;
+            o2 = bits >> 8 & 0xff;
+            o3 = bits & 0xff;
+
+            if (h3 == 64) {
+            tmp_arr[ac++] = String.fromCharCode(o1);
+            } else if (h4 == 64) {
+            tmp_arr[ac++] = String.fromCharCode(o1, o2);
+            } else {
+            tmp_arr[ac++] = String.fromCharCode(o1, o2, o3);
+            }
+        } while (i < data.length);
+
+        dec = tmp_arr.join('');
+
+        return dec.replace(/\0+$/, '');
+    };
+
+    var base64_encode = function(data) {
+        var b64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+        var o1, o2, o3, h1, h2, h3, h4, bits, i = 0,
+        ac = 0,
+        enc = '',
+        tmp_arr = [];
+
+        if (!data) {
+        return data;
+        }
+
+        do { // pack three octets into four hexets
+        o1 = data.charCodeAt(i++);
+        o2 = data.charCodeAt(i++);
+        o3 = data.charCodeAt(i++);
+
+        bits = o1 << 16 | o2 << 8 | o3;
+
+        h1 = bits >> 18 & 0x3f;
+        h2 = bits >> 12 & 0x3f;
+        h3 = bits >> 6 & 0x3f;
+        h4 = bits & 0x3f;
+
+        // use hexets to index into b64, and append result to encoded string
+        tmp_arr[ac++] = b64.charAt(h1) + b64.charAt(h2) + b64.charAt(h3) + b64.charAt(h4);
+        } while (i < data.length);
+
+        enc = tmp_arr.join('');
+
+        var r = data.length % 3;
+
+        return (r ? enc.slice(0, r - 3) : enc) + '==='.slice(r || 3);
+    };
+
+    /**
+     * Override Configuration
+     * @param conf Object
+     */
+    this.setConfig = function(conf) {
+        _config.concat(conf);
+    };
+
     /**
      * sign the request.
+     * @param request
      */
-    this.getSign = function(request) {
-           
-        if(_sign && request.headers) {
-            request.headers['Authorization'] = 'Basic ' + _sign;
-            return request;
-        } 
-        else {
-            return request;
+    this.getSign = function(request, identity) {
+        if(!identity){
+            identity = {};
+            identity[_config.username] = "";
+            identity[_config.password] = "";
         }
+        request.headers['Authorization'] = 'Basic ' + base64_encode(identity[_config.username] + ":" +identity[_config.password]);
+        return request;
     };
-    
+}])
+.provider("crAuth", function(){
+    var authHandler;
+
+    this.$get = ["crAuth", function(crAuth){
+        return crAuth.build(this.authHandler);
+    }];
+})
+.service("crAuth", [function() {
+
+    var authHandler;
+    var sessionHandler;
+
+    this.build = function(a) {
+        this.authHandler = a;
+    };
+
+    this.setAuthHandler = function(a) {
+        this.authHandler = a;
+    };
+
     /**
-     * set the sign method. An object with username and password is requested
+     * Clean signature
      */
-    this.setSign = function(sign) {
-        if(sign.username && sign.password) {
-            _sign = _base64.encode(sign.username + ":" + sign.password);
-        }
+    this.purge = function() {
+        this.getSessionHandler().set('cr-auth', null);
     };
-    
-    /**
-     * forge a auth header.
-     */
-    this.forgeSign = function(sign) {
-        return _base64.encode(sign.username + ":" + sign.password);
+
+    this.setSessionHandler = function(s) {
+        this.sessionHandler = s;
     };
-    
-    this.voidSign = function() {
-        _sign = "";
+
+    this.getSessionHandler = function() {
+        return this.sessionHandler;
     };
-    
-    //provider function
-    this.$get = function() {
-        return this;
+
+    this.getAuthHandler = function() {
+        return this.authHandler;
     };
+
+    this.setIdentity = function(identity)
+    {
+        this.getSessionHandler().set('cr-auth', identity);
+    };
+
+    this.getIdentity = function()
+    {
+        return this.getSessionHandler().get('cr-auth');
+    };
+
+    this.sign = function(request){
+        return this.getAuthHandler().getSign(request, this.getIdentity());
+    };
+
+    return this;
 }]);
