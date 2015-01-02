@@ -98,61 +98,92 @@ angular.module('cr.auth', [])
             identity[_config.password] = "";
         }
         request.headers['Authorization'] = 'Basic ' + base64_encode(identity[_config.username] + ":" +identity[_config.password]);
+        console.log("sto usando questa auth", request.headers);
         return request;
     };
 }])
 .provider("crAuth", function(){
     var authHandler;
+    
+    this._providers = [];
+    
+    this.restrictProvidersTo = function(providers) {
+        this._providers = providers;
+    };
 
-    this.$get = ["crAuth", function(crAuth){
-        return crAuth.build(this.authHandler);
+    this.$get = ["crAuthService", function(crAuthService){
+        var service = crAuthService.build(this.authHandler);
+        service.restrictProvidersTo(this._providers);
+        return service;
     }];
 })
-.service("crAuth", [function() {
+.service("crAuthService", ['$rootScope', function($rootScope) {
 
     var authHandler;
     var sessionHandler;
+    this._providers = [];
+    
+    var self = this;
 
-    this.build = function(a) {
-        this.authHandler = a;
+    self.build = function(a) {
+        self.authHandler = a;
+        return self;
     };
 
-    this.setAuthHandler = function(a) {
-        this.authHandler = a;
+    self.setAuthHandler = function(a) {
+        self.authHandler = a;
+    };
+    
+    
+    self.restrictProvidersTo = function(providers) {
+      self._providers = providers;  
     };
 
     /**
      * Clean signature
      */
-    this.purge = function() {
-        this.getSessionHandler().set('cr-auth', null);
+    self.purge = function() {
+        self.getSessionHandler().set('identity', null, "cr-auth");
     };
 
-    this.setSessionHandler = function(s) {
-        this.sessionHandler = s;
+    self.setSessionHandler = function(s) {
+        self.sessionHandler = s;
     };
 
-    this.getSessionHandler = function() {
-        return this.sessionHandler;
+    self.getSessionHandler = function() {
+        return self.sessionHandler;
     };
 
-    this.getAuthHandler = function() {
-        return this.authHandler;
+    self.getAuthHandler = function() {
+        return self.authHandler;
     };
 
-    this.setIdentity = function(identity)
+    self.setIdentity = function(identity)
     {
-        this.getSessionHandler().set('cr-auth', identity);
+        self.getSessionHandler().set('identity', identity, "cr-auth");
     };
 
-    this.getIdentity = function()
+    self.getIdentity = function()
     {
-        return this.getSessionHandler().get('cr-auth');
+        return self.getSessionHandler().get('identity', "cr-auth");
     };
 
-    this.sign = function(request){
-        return this.getAuthHandler().getSign(request, this.getIdentity());
+    self.sign = function(request){
+        return self.getAuthHandler().getSign(request, self.getIdentity());
     };
+    
+    
 
-    return this;
+    $rootScope.$on('cr-auth:identity:login:success', function(event, data) {
+        console.log("providers abilitati", self._providers);
+        if(self._providers.length === 0 || (self._providers.length && self._providers.indexOf(data.provider) !== -1)) {
+            self.purge();
+            console.log("SONO IN AUTH E IL PROVIDER e': ", data.provider, self._providers);
+            self.setIdentity(data);
+            $rootScope.$broadcast('cr-auth:identity:ready:success', self);
+        }
+    });
+    
+
+    return self;
 }]);
