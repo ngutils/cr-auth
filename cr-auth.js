@@ -1,10 +1,7 @@
 angular.module('cr.auth', [])
 .service('crAuthBasic', [function() {
 
-    var _config = {
-        username: "username",
-        password: "password"
-    };
+    var _credentials = {};
 
     var base64_decode = function(data) {
         var b64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
@@ -80,25 +77,39 @@ angular.module('cr.auth', [])
     };
 
     /**
-     * Override Configuration
+     * Override credentials
+     * @param credentials Object
+     */
+    this.setCredentials = function(credentials) {
+    	_credentials = credentials;
+    };
+    
+    /**
+     * Void credentials
      * @param conf Object
      */
-    this.setConfig = function(conf) {
-        _config.concat(conf);
+    this.voidCredentials = function() {
+        _credentials = {};
     };
 
     /**
      * sign the request.
      * @param request
      */
-    this.getSign = function(request, identity) {
-        if(!identity){
-            identity = {};
-            identity[_config.username] = "";
-            identity[_config.password] = "";
+    this.getSign = function(request/*, identity*/) {
+//        if(!identity){
+//            identity = {};
+//            identity[_config.username] = "";
+//            identity[_config.password] = "";
+//        }
+        if(_credentials.username && _credentials.password && request.headers) {
+        	request.headers['Authorization'] = 'Basic ' + base64_encode(_credentials.username + ":" + _credentials['password']);
         }
-        request.headers['Authorization'] = 'Basic ' + base64_encode(identity[_config.username] + ":" +identity[_config.password]);
-        console.log("sto usando questa auth", request.headers);
+        else {
+        	if(request.headers) {
+        		delete request.headers['Authorization'];
+        	}
+        }
         return request;
     };
 }])
@@ -112,7 +123,7 @@ angular.module('cr.auth', [])
     };
 
     this.$get = ["crAuthService", function(crAuthService){
-        var service = crAuthService.build(this.authHandler);
+        var service = crAuthService.createService(this.authHandler);
         service.restrictProvidersTo(this._providers);
         return service;
     }];
@@ -125,7 +136,7 @@ angular.module('cr.auth', [])
     
     var self = this;
 
-    self.build = function(a) {
+    self.createService = function(a) {
         self.authHandler = a;
         return self;
     };
@@ -142,9 +153,7 @@ angular.module('cr.auth', [])
     /**
      * Clean signature
      */
-    self.purge = function() {
-        self.getSessionHandler().set('identity', null, "cr-auth");
-    };
+   
 
     self.setSessionHandler = function(s) {
         self.sessionHandler = s;
@@ -165,7 +174,12 @@ angular.module('cr.auth', [])
 
     self.getIdentity = function()
     {
-        return self.getSessionHandler().get('identity', "cr-auth");
+    	return self.getSessionHandler().get('identity', "cr-auth");
+    };
+    
+    self.purgeIdentity = function()
+    {
+        return self.getSessionHandler().purgeNamespace("cr-auth");
     };
 
     self.sign = function(request){
@@ -174,16 +188,80 @@ angular.module('cr.auth', [])
     
     
 
-    $rootScope.$on('cr-auth:identity:login:success', function(event, data) {
-        console.log("providers abilitati", self._providers);
-        if(self._providers.length === 0 || (self._providers.length && self._providers.indexOf(data.provider) !== -1)) {
-            self.purge();
-            console.log("SONO IN AUTH E IL PROVIDER e': ", data.provider, self._providers);
-            self.setIdentity(data);
-            $rootScope.$broadcast('cr-auth:identity:ready:success', self);
-        }
+    $rootScope.$on('auth:login:success', function(event, data) {
+    	if(self._providers.length === 0 || (self._providers.length && self._providers.indexOf(data.provider) !== -1)) {
+    		//self.purgeIdentity();
+    		self.setIdentity(data);
+    		if(self.getAuthHandler()) {
+    			self.getAuthHandler().setCredentials(data.auth);
+    		}
+    		$rootScope.$broadcast('auth:identity:success', self);
+    	}
+    });
+    
+    $rootScope.$on('auth:logout:success', function(event, data) {
+        self.purgeIdentity();
+		if(self.getAuthHandler()) {
+			self.getAuthHandler().voidCredentials();
+		}
+        $rootScope.$broadcast('auth:purge:success', self);
     });
     
 
     return self;
-}]);
+}])
+.directive('googleSignin', ['$rootScope', function($rootScope) {
+  return {
+    restrict: 'A',
+    template: '<span id="signinButton"></span>',
+    replace: true,
+    scope: {
+      afterSignin: '&'
+    },
+    link: function(scope, ele, attrs) {
+      // Set standard google class
+      attrs.$set('class', 'g-signin');
+      
+      console.log("attrs", attrs);
+      // Set the clientid
+      attrs.$set('data-clientid', 
+          attrs.clientId+'.apps.googleusercontent.com');
+      // build scope urls
+      var scopes = attrs.scopes || [
+        'auth/plus.login', 
+        'auth/userinfo.email'
+      ];
+      var scopeUrls = [];
+      for (var i = 0; i < scopes.length; i++) {
+        scopeUrls.push('https://www.googleapis.com/' + scopes[i]);
+      }
+
+      // Create a custom callback method
+      var callbackId = "_googleSigninCallback",
+          directiveScope = scope;
+      window[callbackId] = function() {
+        var oauth = arguments[0];
+        if(directiveScope.afterSignin) {
+            directiveScope.afterSignin({oauth: oauth});
+        }
+        window[callbackId] = null;
+        $rootScope.$broadcast("auth:login:success", {"provider":"google", "auth": oauth});
+      };
+
+      // Set standard google signin button settings
+      attrs.$set('data-callback', callbackId);
+      attrs.$set('data-cookiepolicy', 'single_host_origin');
+      attrs.$set('data-requestvisibleactions', 'http://schemas.google.com/AddActivity');
+      attrs.$set('data-scope', scopeUrls.join(' '));
+
+      // Finally, reload the client library to 
+      // force the button to be painted in the browser
+      (function() {
+       var po = document.createElement('script'); po.type = 'text/javascript'; po.async = true;
+       po.src = 'https://apis.google.com/js/client:plusone.js';
+       var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+      })();
+    }
+  };
+}])
+;
