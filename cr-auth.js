@@ -91,11 +91,10 @@ angular.module('cr.auth', [])
      * sign the request.
      * @param request
      */
-    this.getSign = function(request/*, identity*/) {
-        if(_credentials.username && _credentials.password && request.headers) {
+    this.getSign = function(request) {
+        if(_credentials.username != undefined && _credentials.password != undefined) {
         	request.headers['Authorization'] = 'Basic ' + base64_encode(_credentials.username + ":" + _credentials['password']);
-        }
-        else {
+        } else {
         	if(request.headers) {
         		delete request.headers['Authorization'];
         	}
