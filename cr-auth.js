@@ -76,7 +76,7 @@ angular.module('cr.auth', [])
      * @param credentials Object
      */
     this.setCredentials = function(credentials) {
-    	_credentials = credentials;
+      _credentials = credentials;
     };
 
     /**
@@ -93,11 +93,11 @@ angular.module('cr.auth', [])
      */
     this.getSign = function(request) {
         if(_credentials.username != undefined && _credentials.password != undefined) {
-        	request.headers['Authorization'] = 'Basic ' + base64_encode(_credentials.username + ":" + _credentials['password']);
+          request.headers['Authorization'] = 'Basic ' + base64_encode(_credentials.username + ":" + _credentials['password']);
         } else {
-        	if(request.headers) {
-        		delete request.headers['Authorization'];
-        	}
+          if(request.headers) {
+            delete request.headers['Authorization'];
+          }
         }
         return request;
     };
@@ -123,6 +123,7 @@ angular.module('cr.auth', [])
 .service("crAuthService", ['$rootScope', function($rootScope) {
     var authHandler;
     var sessionHandler;
+    var aclHandler;
     this._providers = [];
 
     var self = this;
@@ -141,6 +142,7 @@ angular.module('cr.auth', [])
      */
     self.setAuthHandler = function(a) {
         self.authHandler = a;
+        self.restoreIdentity();
     };
 
     /**
@@ -149,6 +151,24 @@ angular.module('cr.auth', [])
     self.getAuthHandler = function() {
         return self.authHandler;
     };
+
+    /**
+    * set acl handler
+    * @param Object a
+    */
+    self.setAclHandler = function(a) {
+      self.aclHandler = a;
+      self.restoreIdentity();
+    };
+    /**
+    * @return Object
+    */
+    self.getAclHandler = function() {
+      return self.aclHandler;
+    };
+
+
+
 
     /**
      * Retrict successuful login event
@@ -163,7 +183,23 @@ angular.module('cr.auth', [])
      */
     self.setSessionHandler = function(s) {
         self.sessionHandler = s;
+        self.restoreIdentity();
     };
+
+    self.restoreIdentity = function() {
+      var identity = self.getIdentity();
+      if(!identity || (identity && !identity.auth && !identity.role) || !self.getAuthHandler() || !self.getAclHandler()) {
+        return;
+      }
+      if(self.getAuthHandler() && identity && identity.auth) {
+        self.getAuthHandler().setCredentials(identity.auth);
+      }
+      if(self.getAclHandler() && identity && identity.role) {
+        self.getAclHandler().setRole(identity.role);
+      }
+
+      $rootScope.$broadcast("auth:restore:success", self);
+    }
 
     /**
      * Return session handler for this service
@@ -188,7 +224,7 @@ angular.module('cr.auth', [])
      */
     self.getIdentity = function()
     {
-    	return self.getSessionHandler().get('identity', "cr-auth");
+      return self.getSessionHandler().get('identity', "cr-auth");
     };
 
     /**
@@ -209,20 +245,23 @@ angular.module('cr.auth', [])
     };
 
     $rootScope.$on('auth:login:success', function(event, data) {
-    	if(self._providers.length === 0 || (self._providers.length && self._providers.indexOf(data.provider) !== -1)) {
-    		self.setIdentity(data);
-    		if(self.getAuthHandler()) {
-    			self.getAuthHandler().setCredentials(data.auth);
-    		}
-    		$rootScope.$broadcast('auth:identity:success', self);
-    	}
+      if(self._providers.length === 0 || (self._providers.length && self._providers.indexOf(data.provider) !== -1)) {
+        self.setIdentity(data);
+        if(self.getAuthHandler()) {
+          self.getAuthHandler().setCredentials(data.auth);
+        }
+        if(self.getAclHandler() && data.role) {
+          self.getAclHandler().setRole(data.role);
+        }
+        $rootScope.$broadcast('auth:identity:success', self);
+      }
     });
 
     $rootScope.$on('auth:logout:success', function(event, data) {
         self.purgeIdentity();
-		if(self.getAuthHandler()) {
-			self.getAuthHandler().voidCredentials();
-		}
+    if(self.getAuthHandler()) {
+      self.getAuthHandler().voidCredentials();
+    }
         $rootScope.$broadcast('auth:purge:success', self);
     });
     return self;
