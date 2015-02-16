@@ -120,7 +120,7 @@ angular.module('cr.auth', [])
         return service;
     }];
 })
-.service("crAuthService", ['$rootScope', function($rootScope) {
+.service("crAuthService", ['$rootScope', "$log", function($rootScope, $log) {
     var authHandler;
     var sessionHandler;
     var aclHandler;
@@ -199,6 +199,7 @@ angular.module('cr.auth', [])
       }
 
       $rootScope.$broadcast("auth:restore:success", self);
+      $log.debug("[crAuth] Broadcast auth:restore:success");
     }
 
     /**
@@ -215,6 +216,7 @@ angular.module('cr.auth', [])
      */
     self.setIdentity = function(identity)
     {
+        $log.debug("[crAuth] Identity:", identity);
         self.getSessionHandler().set('identity', identity, "cr-auth");
     };
 
@@ -254,15 +256,17 @@ angular.module('cr.auth', [])
           self.getAclHandler().setRole(data.role);
         }
         $rootScope.$broadcast('auth:identity:success', self);
+      $log.debug("[crAuth] Broadcast auth:identity:success");
       }
     });
 
     $rootScope.$on('auth:logout:success', function(event, data) {
-        self.purgeIdentity();
-    if(self.getAuthHandler()) {
-      self.getAuthHandler().voidCredentials();
-    }
-        $rootScope.$broadcast('auth:purge:success', self);
+      self.purgeIdentity();
+      if(self.getAuthHandler()) {
+        self.getAuthHandler().voidCredentials();
+      }
+      $rootScope.$broadcast('auth:purge:success', self);
+      $log.debug("[crAuth] Broadcast auth:purge:success");
     });
     return self;
 }])
