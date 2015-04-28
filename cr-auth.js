@@ -265,6 +265,9 @@ angular.module('cr.auth', [])
       if(self.getAuthHandler()) {
         self.getAuthHandler().voidCredentials();
       }
+      if(self.getAclHandler()) {
+        self.getAclHandler().setRole();
+      }
       $rootScope.$broadcast('auth:purge:success', self);
       $log.debug("[crAuth] Broadcast auth:purge:success");
     });
