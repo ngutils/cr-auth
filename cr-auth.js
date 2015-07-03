@@ -1,4 +1,35 @@
 angular.module('cr.auth', [])
+.service('crOAuth', [function() {
+    var _credentials = {};
+
+
+    this.setCredentials = function(credentials) {
+      _credentials = credentials;
+    };
+
+    /**
+     * Void credentials
+     * @param conf Object
+     */
+    this.voidCredentials = function() {
+        _credentials = {};
+    };
+
+    /**
+     * sign the request.
+     * @param request
+     */
+    this.getSign = function(request) {
+        if(_credentials.token != undefined) {
+          request.headers['Authorization'] = 'Bearer ' + _credentials.token;
+        } else {
+          if(request.headers) {
+            delete request.headers['Authorization'];
+          }
+        }
+        return request;
+    };
+}])
 .service('crAuthBasic', [function() {
     var _credentials = {};
 
